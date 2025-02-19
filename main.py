@@ -4,10 +4,12 @@ import numpy as np
 import groq
 import joblib
 import os
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import simpleSplit
 
 # Load trained model
 model_path = "Model/workout_recommender.pkl"
-
 if os.path.exists(model_path):
     model = joblib.load(model_path)
 else:
@@ -60,71 +62,90 @@ st.markdown(
 # Function to calculate BMI, BFP, and category
 def calculate_bmi_bfp_category(weight, height, age, gender):
     bmi = weight / (height ** 2)
-    if gender == "Male":
-        bfp = (1.20 * bmi) + (0.23 * age) - 16.2
-    else:
-        bfp = (1.20 * bmi) + (0.23 * age) - 5.4
-
-    # Categorizing BMI
-    if bmi < 16:
-        bmi_category = "Severe Thinness"
-    elif 16 <= bmi < 17:
-        bmi_category = "Moderate Thinness"
-    elif 17 <= bmi < 18.5:
-        bmi_category = "Mild Thinness"
-    elif 18.5 <= bmi < 25:
-        bmi_category = "Normal"
-    elif 25 <= bmi < 30:
-        bmi_category = "Overweight"
-    elif 30 <= bmi < 35:
-        bmi_category = "Obese"
-    else:
-        bmi_category = "Severe Obese"
-
+    bfp = (1.20 * bmi) + (0.23 * age) - (16.2 if gender == "Male" else 5.4)
+    bmi_category = (
+        "Severe Thinness" if bmi < 16 else
+        "Moderate Thinness" if bmi < 17 else
+        "Mild Thinness" if bmi < 18.5 else
+        "Normal" if bmi < 25 else
+        "Overweight" if bmi < 30 else
+        "Obese" if bmi < 35 else "Severe Obese"
+    )
     return round(bmi, 2), round(bfp, 2), bmi_category
 
 # Function to generate workout plan using Groq API
-def generate_workout(plan_id, fitness_goal):
-    api_key = "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"  # Replace with your actual API key
+def generate_workout(plan_id, fitness_goal, workout_type, intensity, hypertension, disability):
+    api_key = "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"  # Replace with actual API key
     client = groq.Client(api_key=api_key)
-
-    prompt = f"Generate a detailed workout plan for someone assigned to exercise plan {plan_id} with the goal of {fitness_goal}."
+    prompt = (f"Generate a workout plan for a {intensity} user assigned to plan {plan_id}. "
+              f"User prefers {workout_type} workouts, goal: {fitness_goal}. "
+              f"Considerations: Hypertension={hypertension}, Disability={disability}.")
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
-        messages=[
-            {"role": "system", "content": "You are a fitness expert."},
-            {"role": "user", "content": prompt},
-        ]
+        messages=[{"role": "system", "content": "You are a fitness expert."},
+                  {"role": "user", "content": prompt}]
     )
     return response.choices[0].message.content
 
-# Streamlit UI
+# Function to save workout plan as a PDF
+def save_pdf(filename, user_data, workout_plan):
+    c = canvas.Canvas(filename, pagesize=letter)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(100, 750, "🏋️ AI Personal Workout Plan")
+    c.line(100, 745, 500, 745)
+    y = 720
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(100, y, "📌 User Information:")
+    y -= 20
+    c.setFont("Helvetica", 12)
+    for key, value in user_data.items():
+        c.drawString(100, y, f"• {key}: {value}")
+        y -= 20
+    y -= 20
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(100, y, "🏋️ Workout Plan:")
+    y -= 20
+    c.setFont("Helvetica", 12)
+    for line in workout_plan.split("\n"):
+        wrapped_lines = simpleSplit(line, "Helvetica", 12, 400)
+        for wrapped_line in wrapped_lines:
+            c.drawString(100, y, wrapped_line)
+            y -= 15
+            if y < 50:
+                c.showPage()
+                c.setFont("Helvetica", 12)
+                y = 750
+    c.save()
+
 st.markdown('<h1 class="emoji">🏆 FITIN APP 🏆</h1>', unsafe_allow_html=True)
 
 # User inputs
-with st.container():
-    weight = st.number_input("Enter your weight (kg):", min_value=30.0, max_value=200.0, step=0.1)
-    height = st.number_input("Enter your height (m):", min_value=1.0, max_value=2.5, step=0.01)
-    age = st.number_input("Enter your age:", min_value=10, max_value=100, step=1)
-    gender = st.selectbox("Select your gender:", ["Male", "Female"])
-    fitness_goal = st.text_input("Enter your fitness goal (e.g., weight loss, muscle gain):")
+weight = st.number_input("Enter your weight (kg):", min_value=30.0, max_value=200.0, step=0.1)
+height = st.number_input("Enter your height (m):", min_value=1.0, max_value=2.5, step=0.01)
+age = st.number_input("Enter your age:", min_value=10, max_value=100, step=1)
+gender = st.selectbox("Select your gender:", ["Male", "Female"])
+fitness_goal = st.text_input("Enter your fitness goal:")
+workout_type = st.selectbox("Select workout type:", ["Gym", "Home", "Bodyweight"])
+intensity = st.selectbox("Select workout intensity:", ["Beginner", "Intermediate", "Advanced"])
+hypertension = st.radio("Hypertension?", ["Yes", "No"])
+disability = st.radio("Disability?", ["Yes", "No"])
 
 if st.button("🏃 Get Workout Plan"):
     if not fitness_goal:
         st.warning("⚠️ Please enter a fitness goal!")
     else:
         bmi, bfp, bmi_category = calculate_bmi_bfp_category(weight, height, age, gender)
-
         st.subheader("📌 Your Fitness Analysis")
-        st.markdown(f"<p style='color: white;'>🔥 <b>BMI:</b> {bmi} kg/m²</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='color: white;'>💧 <b>Body Fat Percentage (BFP):</b> {bfp}%</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='color: white;'>📊 <b>BMI Category:</b> {bmi_category}</p>", unsafe_allow_html=True)
-
+        st.write(f"**BMI:** {bmi}")
+        st.write(f"**BFP:** {bfp}%")
+        st.write(f"**Category:** {bmi_category}")
         input_data = np.array([[weight, height, bmi, bfp, 0 if gender == "Male" else 1, age, 4]])
         predicted_plan = model.predict(input_data)[0]
-
-        with st.spinner("⏳ Generating your workout plan..."):
-            personalized_plan = generate_workout(predicted_plan, fitness_goal)
-
+        personalized_plan = generate_workout(predicted_plan, fitness_goal, workout_type, intensity, hypertension, disability)
         st.subheader("🏋️ Your Personalized Workout Plan")
-        st.markdown(f"<div class='output-box'>{personalized_plan}</div>", unsafe_allow_html=True)
+        st.markdown(f'<div class="output-box">{personalized_plan}</div>', unsafe_allow_html=True)
+        user_info = {"Weight": weight, "Height": height, "Age": age, "Gender": gender, "BMI": bmi, "BFP": bfp, "Category": bmi_category}
+        pdf_filename = "Workout_Plan.pdf"
+        save_pdf(pdf_filename, user_info, personalized_plan)
+        with open(pdf_filename, "rb") as pdf_file:
+            st.download_button("Download Workout Plan as PDF", data=pdf_file, file_name=pdf_filename, mime="application/pdf")
