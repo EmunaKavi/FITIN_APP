@@ -1,16 +1,17 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import groq
 import joblib
 import os
 
 # Load trained model
-MODEL_PATH = "Model/workout_recommender.pkl"
+model_path = "Model/workout_recommender.pkl"
 
-if os.path.exists(MODEL_PATH):
-    model = joblib.load(MODEL_PATH)
+if os.path.exists(model_path):
+    model = joblib.load(model_path)
 else:
-    st.error("❌ Error: Model file not found!")
+    st.error("Error: Model file not found!")
     st.stop()
 
 # Custom CSS for better UI
@@ -35,7 +36,6 @@ st.markdown(
         background-color: #4CAF50;
         color: white;
         border-radius: 10px;
-        padding: 0.5rem 1rem;
         font-size: 1rem;
     }
     .stButton>button:hover {
@@ -47,6 +47,10 @@ st.markdown(
         padding: 1rem;
         border-radius: 10px;
         margin-top: 1rem;
+    }
+    .emoji {
+        font-size: 2rem;
+        text-align: center;
     }
     </style>
     """,
@@ -61,6 +65,7 @@ def calculate_bmi_bfp_category(weight, height, age, gender):
     else:
         bfp = (1.20 * bmi) + (0.23 * age) - 5.4
 
+    # Categorizing BMI
     if bmi < 16:
         bmi_category = "Severe Thinness"
     elif 16 <= bmi < 17:
@@ -78,10 +83,25 @@ def calculate_bmi_bfp_category(weight, height, age, gender):
 
     return round(bmi, 2), round(bfp, 2), bmi_category
 
-# Streamlit UI
-st.markdown('<h1 style="text-align: center; color: white;">🏆 FITIN APP 🏆</h1>', unsafe_allow_html=True)
+# Function to generate workout plan using Groq API
+def generate_workout(plan_id, fitness_goal):
+    api_key = "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"  # Replace with your actual API key
+    client = groq.Client(api_key=api_key)
 
-# User Inputs
+    prompt = f"Generate a detailed workout plan for someone assigned to exercise plan {plan_id} with the goal of {fitness_goal}."
+    response = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {"role": "system", "content": "You are a fitness expert."},
+            {"role": "user", "content": prompt},
+        ]
+    )
+    return response.choices[0].message.content
+
+# Streamlit UI
+st.markdown('<h1 class="emoji">🏆 FITIN APP 🏆</h1>', unsafe_allow_html=True)
+
+# User inputs
 with st.container():
     weight = st.number_input("Enter your weight (kg):", min_value=30.0, max_value=200.0, step=0.1)
     height = st.number_input("Enter your height (m):", min_value=1.0, max_value=2.5, step=0.01)
@@ -96,15 +116,15 @@ if st.button("🏃 Get Workout Plan"):
         bmi, bfp, bmi_category = calculate_bmi_bfp_category(weight, height, age, gender)
 
         st.subheader("📌 Your Fitness Analysis")
-        st.markdown(f"🔥 **BMI:** {bmi} kg/m²")
-        st.markdown(f"💧 **Body Fat Percentage (BFP):** {bfp}%")
-        st.markdown(f"📊 **BMI Category:** {bmi_category}")
+        st.markdown(f"<p style='color: white;'>🔥 <b>BMI:</b> {bmi} kg/m²</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color: white;'>💧 <b>Body Fat Percentage (BFP):</b> {bfp}%</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color: white;'>📊 <b>BMI Category:</b> {bmi_category}</p>", unsafe_allow_html=True)
 
-        # Model Prediction
         input_data = np.array([[weight, height, bmi, bfp, 0 if gender == "Male" else 1, age, 4]])
         predicted_plan = model.predict(input_data)[0]
 
-        st.subheader("🏋️ Your Workout Plan ID")
-        st.write(f"📌 Predicted Plan ID: {predicted_plan}")
+        with st.spinner("⏳ Generating your workout plan..."):
+            personalized_plan = generate_workout(predicted_plan, fitness_goal)
 
-        st.success("✅ Workout plan generated successfully!")
+        st.subheader("🏋️ Your Personalized Workout Plan")
+        st.markdown(f"<div class='output-box'>{personalized_plan}</div>", unsafe_allow_html=True)
