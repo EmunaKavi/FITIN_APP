@@ -1,6 +1,5 @@
 streamlit
-groq
-pandas
 numpy
+pandas
 joblib
-scikit-learn
+reportlab
