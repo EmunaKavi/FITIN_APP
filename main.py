@@ -13,7 +13,7 @@ import pyttsx3
 import tempfile
 from io import BytesIO
 from googleapiclient.discovery import build
-import shutil  # to check for eSpeak
+import shutil  # for checking if eSpeak exists
 from gtts import gTTS  # fallback TTS engine
 
 # Set your Groq API key
@@ -171,34 +171,31 @@ def text_to_speech(text):
     if not text:
         st.error("No text available for conversion.")
         return None, None
-    # Check if eSpeak (or eSpeak-ng) is installed
-    if shutil.which("espeak") is None:
-        st.info("eSpeak not found. Using gTTS as a fallback.")
+    # If eSpeak is available, try pyttsx3 first; otherwise, use gTTS.
+    if shutil.which("espeak") is not None:
         try:
-            tts = gTTS(text)
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_file:
+            engine = pyttsx3.init()
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
                 temp_filename = temp_file.name
-            tts.save(temp_filename)
+            engine.save_to_file(text, temp_filename)
+            engine.runAndWait()
             with open(temp_filename, "rb") as audio_file:
                 audio_data = audio_file.read()
             os.remove(temp_filename)
-            return audio_data, "audio/mp3"
+            return audio_data, "audio/wav"
         except Exception as e:
-            st.error("Text-to-speech conversion using gTTS failed.")
-            st.error(str(e))
-            return None, None
+            st.info("pyttsx3 conversion failed. Falling back to gTTS.")
     try:
-        engine = pyttsx3.init()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
+        tts = gTTS(text)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_file:
             temp_filename = temp_file.name
-        engine.save_to_file(text, temp_filename)
-        engine.runAndWait()
+        tts.save(temp_filename)
         with open(temp_filename, "rb") as audio_file:
             audio_data = audio_file.read()
         os.remove(temp_filename)
-        return audio_data, "audio/wav"
+        return audio_data, "audio/mp3"
     except Exception as e:
-        st.error("Text-to-speech conversion failed.")
+        st.error("Text-to-speech conversion failed using gTTS.")
         st.error(str(e))
         return None, None
 
