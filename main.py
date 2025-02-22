@@ -215,7 +215,7 @@ if "diet_text" not in st.session_state:
 if "audio_buffer" not in st.session_state:
     st.session_state["audio_buffer"] = None
 
-st.title("AI Personal Workout, Diet, Audio & Video Plan Recommender")
+st.title("🏆Fitin APP🏆")
 
 # User inputs with added symbols for better visual cues
 weight = st.number_input("Enter your weight (kg) ⚖️:", min_value=30.0, max_value=200.0, step=0.1)
