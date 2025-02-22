@@ -1,38 +1,37 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import groq
 import joblib
 import os
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import simpleSplit
 
-# Load trained model
-model_path = "Model/workout_recommender.pkl"
-if os.path.exists(model_path):
-    model = joblib.load(model_path)
+# -------- Load the trained model --------
+MODEL_PATH = os.path.join("Model", "workout_recommender.pkl")
+
+if os.path.exists(MODEL_PATH):
+    try:
+        model = joblib.load(MODEL_PATH)
+    except Exception as e:
+        st.error(f"Error loading model: {e}")
+        st.stop()
 else:
-    st.error("Error: Model file not found!")
+    st.error("Error: Model file not found! Please ensure 'workout_recommender.pkl' exists in the 'Model' folder.")
     st.stop()
 
-# Custom CSS for better UI
+# -------- Custom CSS for UI --------
 st.markdown(
     """
     <style>
     body {
-        background-image: url('https://t4.ftcdn.net/jpg/01/74/21/25/360_F_174212531_cerVf4uP6vinBWieBB46p2P5xVhnsNSK.jpg');
-        background-size: cover;
-        background-attachment: fixed;
+        background-color: #1E1E1E;
         color: white;
     }
     .stApp {
         background: rgba(20, 20, 20, 0.85);
-        width: 60%;
-        margin: auto;
         padding: 2rem;
-        border-radius: 20px;
-        backdrop-filter: blur(8px);
+        border-radius: 15px;
     }
     .stButton>button {
         background-color: #4CAF50;
@@ -59,7 +58,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Function to calculate BMI, BFP, and category
+# -------- Function to calculate BMI, BFP, and category --------
 def calculate_bmi_bfp_category(weight, height, age, gender):
     bmi = weight / (height ** 2)
     bfp = (1.20 * bmi) + (0.23 * age) - (16.2 if gender == "Male" else 5.4)
@@ -73,21 +72,7 @@ def calculate_bmi_bfp_category(weight, height, age, gender):
     )
     return round(bmi, 2), round(bfp, 2), bmi_category
 
-# Function to generate workout plan using Groq API
-def generate_workout(plan_id, fitness_goal, workout_type, intensity, hypertension, disability):
-    api_key = "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"  # Replace with actual API key
-    client = groq.Client(api_key=api_key)
-    prompt = (f"Generate a workout plan for a {intensity} user assigned to plan {plan_id}. "
-              f"User prefers {workout_type} workouts, goal: {fitness_goal}. "
-              f"Considerations: Hypertension={hypertension}, Disability={disability}.")
-    response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[{"role": "system", "content": "You are a fitness expert."},
-                  {"role": "user", "content": prompt}]
-    )
-    return response.choices[0].message.content
-
-# Function to save workout plan as a PDF
+# -------- Function to save workout plan as a PDF --------
 def save_pdf(filename, user_data, workout_plan):
     c = canvas.Canvas(filename, pagesize=letter)
     c.setFont("Helvetica-Bold", 14)
@@ -117,6 +102,7 @@ def save_pdf(filename, user_data, workout_plan):
                 y = 750
     c.save()
 
+# -------- Streamlit UI --------
 st.markdown('<h1 class="emoji">🏆 FITIN APP 🏆</h1>', unsafe_allow_html=True)
 
 # User inputs
@@ -139,13 +125,28 @@ if st.button("🏃 Get Workout Plan"):
         st.write(f"**BMI:** {bmi}")
         st.write(f"**BFP:** {bfp}%")
         st.write(f"**Category:** {bmi_category}")
+
         input_data = np.array([[weight, height, bmi, bfp, 0 if gender == "Male" else 1, age, 4]])
-        predicted_plan = model.predict(input_data)[0]
-        personalized_plan = generate_workout(predicted_plan, fitness_goal, workout_type, intensity, hypertension, disability)
+        
+        try:
+            predicted_plan = model.predict(input_data)[0]
+        except Exception as e:
+            st.error(f"Error in model prediction: {e}")
+            st.stop()
+
+        # Mock workout plan (since API is removed for security)
+        personalized_plan = f"Your recommended workout plan: {predicted_plan} for {fitness_goal}, {workout_type}, {intensity}"
+
         st.subheader("🏋️ Your Personalized Workout Plan")
         st.markdown(f'<div class="output-box">{personalized_plan}</div>', unsafe_allow_html=True)
-        user_info = {"Weight": weight, "Height": height, "Age": age, "Gender": gender, "BMI": bmi, "BFP": bfp, "Category": bmi_category}
+
+        # Save PDF & Download
+        user_info = {
+            "Weight": weight, "Height": height, "Age": age, 
+            "Gender": gender, "BMI": bmi, "BFP": bfp, "Category": bmi_category
+        }
         pdf_filename = "Workout_Plan.pdf"
         save_pdf(pdf_filename, user_info, personalized_plan)
+
         with open(pdf_filename, "rb") as pdf_file:
             st.download_button("Download Workout Plan as PDF", data=pdf_file, file_name=pdf_filename, mime="application/pdf")
