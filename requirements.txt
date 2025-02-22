@@ -8,3 +8,4 @@ PyPDF2
 pyttsx3
 google-api-python-client
 gTTS
+pydub
