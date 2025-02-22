@@ -13,8 +13,10 @@ import pyttsx3
 import tempfile
 from io import BytesIO
 from googleapiclient.discovery import build
-import shutil  # for checking if eSpeak exists
-from gtts import gTTS  # fallback TTS engine
+import shutil    # For checking if eSpeak is installed
+import time      # For delay between API calls
+from gtts import gTTS, gTTSError  # Fallback TTS engine
+from pydub import AudioSegment  # To join audio chunks
 
 # Set your Groq API key
 api_key = "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"
@@ -167,11 +169,68 @@ def save_pdf(filename, user_data, workout_plan, diet_plan=None, video_url=None):
     
     c.save()
 
+def chunk_text(text, max_length=200):
+    words = text.split()
+    chunks = []
+    current_chunk = ""
+    for word in words:
+        # Add one for the space
+        if len(current_chunk) + len(word) + 1 > max_length:
+            chunks.append(current_chunk)
+            current_chunk = word
+        else:
+            if current_chunk:
+                current_chunk += " " + word
+            else:
+                current_chunk = word
+    if current_chunk:
+        chunks.append(current_chunk)
+    return chunks
+
+def tts_gtts_chunked(text, delay=2):
+    chunks = chunk_text(text, max_length=200)
+    combined = None
+    for chunk in chunks:
+        success = False
+        retries = 3
+        for attempt in range(retries):
+            try:
+                tts = gTTS(chunk)
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_file:
+                    temp_filename = temp_file.name
+                tts.save(temp_filename)
+                chunk_audio = AudioSegment.from_file(temp_filename, format="mp3")
+                os.remove(temp_filename)
+                if combined is None:
+                    combined = chunk_audio
+                else:
+                    combined += chunk_audio
+                success = True
+                time.sleep(delay)
+                break
+            except gTTSError as e:
+                if "429" in str(e):
+                    st.warning(f"429 error for a chunk. Retrying in {delay} seconds... (Attempt {attempt+1}/{retries})")
+                    time.sleep(delay)
+                else:
+                    st.error("gTTS conversion failed for a chunk: " + str(e))
+                    break
+        if not success:
+            st.error("gTTS conversion failed for a chunk after multiple retries.")
+            return None, None
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_file:
+        combined_filename = temp_file.name
+    combined.export(combined_filename, format="mp3")
+    with open(combined_filename, "rb") as audio_file:
+        audio_data = audio_file.read()
+    os.remove(combined_filename)
+    return audio_data, "audio/mp3"
+
 def text_to_speech(text):
     if not text:
         st.error("No text available for conversion.")
         return None, None
-    # If eSpeak is available, try pyttsx3 first; otherwise, use gTTS.
+    # Try pyttsx3 if eSpeak is available
     if shutil.which("espeak") is not None:
         try:
             engine = pyttsx3.init()
@@ -184,20 +243,9 @@ def text_to_speech(text):
             os.remove(temp_filename)
             return audio_data, "audio/wav"
         except Exception as e:
-            st.info("pyttsx3 conversion failed. Falling back to gTTS.")
-    try:
-        tts = gTTS(text)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_file:
-            temp_filename = temp_file.name
-        tts.save(temp_filename)
-        with open(temp_filename, "rb") as audio_file:
-            audio_data = audio_file.read()
-        os.remove(temp_filename)
-        return audio_data, "audio/mp3"
-    except Exception as e:
-        st.error("Text-to-speech conversion failed using gTTS.")
-        st.error(str(e))
-        return None, None
+            st.info("pyttsx3 conversion failed. Falling back to gTTS (chunked).")
+    # Use chunked gTTS fallback
+    return tts_gtts_chunked(text)
 
 def get_youtube_video(query):
     try:
@@ -228,9 +276,9 @@ if "diet_text" not in st.session_state:
 if "audio_buffer" not in st.session_state:
     st.session_state["audio_buffer"] = None
 
-st.title("🏆 FITIN APP 🏆")
+st.title("🏆 AI Personal Workout, Diet, Audio & Video Plan Recommender")
 
-# User inputs with added symbols for better visual cues
+# User inputs with symbols for better visual cues
 weight = st.number_input("Enter your weight (kg) ⚖️:", min_value=30.0, max_value=200.0, step=0.1)
 height = st.number_input("Enter your height (m) 📏📐:", min_value=1.0, max_value=2.5, step=0.01)
 dob = st.date_input("Enter your Date of Birth (YYYY-MM-DD) 📅:", min_value=datetime.date(1920, 1, 1), max_value=datetime.date.today())
