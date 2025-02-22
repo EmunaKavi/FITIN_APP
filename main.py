@@ -13,6 +13,7 @@ import pyttsx3
 import tempfile
 from io import BytesIO
 from googleapiclient.discovery import build
+import shutil  # For checking if eSpeak is installed
 
 # Set your Groq API key
 api_key = "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"
@@ -171,6 +172,10 @@ def text_to_speech(text):
     if not text:
         st.error("No text available for conversion.")
         return None
+    # Check if eSpeak (or eSpeak-ng) is installed
+    if shutil.which("espeak") is None:
+        st.error("eSpeak or eSpeak-ng is not installed. Please install it (e.g., on Ubuntu, run: sudo apt-get install espeak).")
+        return None
     try:
         engine = pyttsx3.init()
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
@@ -215,7 +220,7 @@ if "diet_text" not in st.session_state:
 if "audio_buffer" not in st.session_state:
     st.session_state["audio_buffer"] = None
 
-st.title("🏆Fitin APP🏆")
+st.title("AI Personal Workout, Diet, Audio & Video Plan Recommender")
 
 # User inputs with added symbols for better visual cues
 weight = st.number_input("Enter your weight (kg) ⚖️:", min_value=30.0, max_value=200.0, step=0.1)
