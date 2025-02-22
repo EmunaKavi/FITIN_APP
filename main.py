@@ -217,21 +217,21 @@ if "audio_buffer" not in st.session_state:
 
 st.title("AI Personal Workout, Diet, Audio & Video Plan Recommender")
 
-# User inputs
-weight = st.number_input("Enter your weight (kg):", min_value=30.0, max_value=200.0, step=0.1)
-height = st.number_input("Enter your height (m):", min_value=1.0, max_value=2.5, step=0.01)
-dob = st.date_input("Enter your Date of Birth (YYYY-MM-DD):", min_value=datetime.date(1920, 1, 1), max_value=datetime.date.today())
+# User inputs with added symbols for better visual cues
+weight = st.number_input("Enter your weight (kg) ⚖️:", min_value=30.0, max_value=200.0, step=0.1)
+height = st.number_input("Enter your height (m) 📏📐:", min_value=1.0, max_value=2.5, step=0.01)
+dob = st.date_input("Enter your Date of Birth (YYYY-MM-DD) 📅:", min_value=datetime.date(1920, 1, 1), max_value=datetime.date.today())
 today = datetime.date.today()
 age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-gender = st.selectbox("Select your gender:", ["Male", "Female"])
-fitness_goal = st.text_input("Enter your fitness goal (e.g., weight loss, muscle gain):")
-workout_type = st.selectbox("Select your preferred workout type:", ["Gym", "Home", "Bodyweight"])
-intensity = st.selectbox("Select workout intensity:", ["Beginner", "Intermediate", "Advanced"])
-hypertension = st.radio("Do you have hypertension?", ["Yes", "No"])
-disability = st.radio("Do you have any disabilities?", ["Yes", "No"])
-diabetes = st.radio("Do you have diabetes?", ["Yes", "No"])
-mother_tongue = st.selectbox("Select your mother tongue:", ["English", "Spanish", "Hindi", "French", "German", "Other"])
-training_focus = st.selectbox("Select your training focus:", ["Strength", "Stamina", "Power", "Flexibility", "Balance", "Endurance"])
+gender = st.selectbox("Select your gender 👤:", ["Male", "Female"])
+fitness_goal = st.text_input("Enter your fitness goal 🎯 (e.g., weight loss, muscle gain):")
+workout_type = st.selectbox("Select your preferred workout type 🏋️:", ["Gym", "Home", "Bodyweight"])
+intensity = st.selectbox("Select workout intensity 🔥:", ["Beginner", "Intermediate", "Advanced"])
+hypertension = st.radio("Do you have hypertension 💓?", ["Yes", "No"])
+disability = st.radio("Do you have any disabilities ♿?", ["Yes", "No"])
+diabetes = st.radio("Do you have diabetes 🩺?", ["Yes", "No"])
+mother_tongue = st.selectbox("Select your mother tongue 🗣️:", ["English", "Spanish", "Hindi", "French", "German", "Other"])
+training_focus = st.selectbox("Select your training focus 💪:", ["Strength", "Stamina", "Power", "Flexibility", "Balance", "Endurance"])
 
 if st.button("Get Workout, Diet & Audio Plan"):
     bmi, bfp, bmi_category = calculate_bmi_bfp_category(weight, height, age, gender)
@@ -239,16 +239,20 @@ if st.button("Get Workout, Diet & Audio Plan"):
     st.write(f"**BMI:** {bmi}")
     st.write(f"**Body Fat Percentage (BFP):** {bfp}")
     st.write(f"**BMI Category:** {bmi_category}")
+    
     input_data = np.array([[weight, height, bmi, bfp, 0 if gender == "Male" else 1, age, 4]])
     predicted_plan = model.predict(input_data)[0]
     personalized_workout = generate_workout(predicted_plan, fitness_goal, workout_type, intensity, hypertension, disability, diabetes, training_focus)
     st.subheader("Your Personalized Workout Plan:")
     st.write(personalized_workout)
+    
     personalized_diet = generate_diet_plan(bmi, bfp, bmi_category, fitness_goal, diabetes)
     st.subheader("Your Personalized Diet & Meal Plan:")
     st.write(personalized_diet)
+    
     st.session_state["workout_text"] = personalized_workout
     st.session_state["diet_text"] = personalized_diet
+    
     user_info = {
         "Weight (kg)": weight,
         "Height (m)": height,
@@ -269,10 +273,13 @@ if st.button("Get Workout, Diet & Audio Plan"):
     # Construct video query using fitness goal, workout type, mother tongue, and training focus
     query = f"{fitness_goal} {workout_type} exercise workout in {mother_tongue} with a focus on {training_focus}"
     video_url = get_youtube_video(query)
+    
     pdf_filename = "Workout_Diet_Audio_Plan.pdf"
     save_pdf(pdf_filename, user_info, personalized_workout, personalized_diet, video_url)
+    
     with open(pdf_filename, "rb") as pdf_file:
         st.download_button(label="Download Your Plan as PDF", data=pdf_file, file_name=pdf_filename, mime="application/pdf")
+    
     if video_url:
         st.video(video_url)
     else:
