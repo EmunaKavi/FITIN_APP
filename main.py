@@ -13,7 +13,8 @@ import pyttsx3
 import tempfile
 from io import BytesIO
 from googleapiclient.discovery import build
-import shutil  # For checking if eSpeak is installed
+import shutil  # to check for eSpeak
+from gtts import gTTS  # fallback TTS engine
 
 # Set your Groq API key
 api_key = "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"
@@ -52,8 +53,6 @@ def calculate_bmi_bfp_category(weight, height, age, gender):
 
 def generate_workout(plan_id, fitness_goal, workout_type, intensity, hypertension, disability, diabetes, training_focus):
     client = groq.Client(api_key=api_key)
-    # For beginners, request one exercise per day and at least one rest day,
-    # and include the training focus in the prompt.
     if intensity.lower() == "beginner":
         workout_description = (f"a workout plan with one exercise per day, designed for beginners, including at least one rest day per week, "
                                f"with a focus on {training_focus}")
@@ -171,11 +170,23 @@ def save_pdf(filename, user_data, workout_plan, diet_plan=None, video_url=None):
 def text_to_speech(text):
     if not text:
         st.error("No text available for conversion.")
-        return None
+        return None, None
     # Check if eSpeak (or eSpeak-ng) is installed
     if shutil.which("espeak") is None:
-        st.error("eSpeak or eSpeak-ng is not installed. Please install it (e.g., on Ubuntu, run: sudo apt-get install espeak).")
-        return None
+        st.info("eSpeak not found. Using gTTS as a fallback.")
+        try:
+            tts = gTTS(text)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_file:
+                temp_filename = temp_file.name
+            tts.save(temp_filename)
+            with open(temp_filename, "rb") as audio_file:
+                audio_data = audio_file.read()
+            os.remove(temp_filename)
+            return audio_data, "audio/mp3"
+        except Exception as e:
+            st.error("Text-to-speech conversion using gTTS failed.")
+            st.error(str(e))
+            return None, None
     try:
         engine = pyttsx3.init()
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_file:
@@ -185,11 +196,11 @@ def text_to_speech(text):
         with open(temp_filename, "rb") as audio_file:
             audio_data = audio_file.read()
         os.remove(temp_filename)
-        return audio_data
+        return audio_data, "audio/wav"
     except Exception as e:
         st.error("Text-to-speech conversion failed.")
         st.error(str(e))
-        return None
+        return None, None
 
 def get_youtube_video(query):
     try:
@@ -220,7 +231,7 @@ if "diet_text" not in st.session_state:
 if "audio_buffer" not in st.session_state:
     st.session_state["audio_buffer"] = None
 
-st.title("AI Personal Workout, Diet, Audio & Video Plan Recommender")
+st.title("🏆 AI Personal Workout, Diet, Audio & Video Plan Recommender")
 
 # User inputs with added symbols for better visual cues
 weight = st.number_input("Enter your weight (kg) ⚖️:", min_value=30.0, max_value=200.0, step=0.1)
@@ -275,7 +286,6 @@ if st.button("Get Workout, Diet & Audio Plan"):
         "Mother Tongue": mother_tongue,
         "Training Focus": training_focus,
     }
-    # Construct video query using fitness goal, workout type, mother tongue, and training focus
     query = f"{fitness_goal} {workout_type} exercise workout in {mother_tongue} with a focus on {training_focus}"
     video_url = get_youtube_video(query)
     
@@ -292,9 +302,10 @@ if st.button("Get Workout, Diet & Audio Plan"):
 
 if st.button("Read Generated Text Aloud"):
     combined_text = st.session_state["workout_text"] + "\n\n" + st.session_state["diet_text"]
-    audio_data = text_to_speech(combined_text)
+    audio_data, mime_type = text_to_speech(combined_text)
     if audio_data is not None:
-        st.session_state["audio_buffer"] = audio_data
+        st.session_state["audio_buffer"] = (audio_data, mime_type)
 
 if st.session_state["audio_buffer"] is not None:
-    st.audio(st.session_state["audio_buffer"], format="audio/wav")
+    audio_data, mime_type = st.session_state["audio_buffer"]
+    st.audio(audio_data, format=mime_type)
