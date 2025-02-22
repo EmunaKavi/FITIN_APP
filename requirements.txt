@@ -1,6 +1,10 @@
 streamlit
-numpy
 pandas
+numpy
+groq
 joblib
-scikit-learn
 reportlab
+PyPDF2
+pyttsx3
+google-api-python-client
+scikit-learn
