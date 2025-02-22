@@ -7,4 +7,4 @@ reportlab
 PyPDF2
 pyttsx3
 google-api-python-client
-scikit-learn
+gTTS
