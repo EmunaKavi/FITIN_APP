@@ -169,12 +169,11 @@ def save_pdf(filename, user_data, workout_plan, diet_plan=None, video_url=None):
     
     c.save()
 
-def chunk_text(text, max_length=200):
+def chunk_text(text, max_length=100):
     words = text.split()
     chunks = []
     current_chunk = ""
     for word in words:
-        # Add one for the space
         if len(current_chunk) + len(word) + 1 > max_length:
             chunks.append(current_chunk)
             current_chunk = word
@@ -187,12 +186,11 @@ def chunk_text(text, max_length=200):
         chunks.append(current_chunk)
     return chunks
 
-def tts_gtts_chunked(text, delay=2):
-    chunks = chunk_text(text, max_length=200)
+def tts_gtts_with_retries(text, retries=3, delay=5):
+    chunks = chunk_text(text, max_length=100)
     combined = None
     for chunk in chunks:
         success = False
-        retries = 3
         for attempt in range(retries):
             try:
                 tts = gTTS(chunk)
@@ -209,12 +207,8 @@ def tts_gtts_chunked(text, delay=2):
                 time.sleep(delay)
                 break
             except gTTSError as e:
-                if "429" in str(e):
-                    st.warning(f"429 error for a chunk. Retrying in {delay} seconds... (Attempt {attempt+1}/{retries})")
-                    time.sleep(delay)
-                else:
-                    st.error("gTTS conversion failed for a chunk: " + str(e))
-                    break
+                st.warning(f"429 error for a chunk. Retrying in {delay} seconds... (Attempt {attempt+1}/{retries})")
+                time.sleep(delay)
         if not success:
             st.error("gTTS conversion failed for a chunk after multiple retries.")
             return None, None
@@ -230,7 +224,7 @@ def text_to_speech(text):
     if not text:
         st.error("No text available for conversion.")
         return None, None
-    # Try pyttsx3 if eSpeak is available
+    # Try pyttsx3 with eSpeak if available
     if shutil.which("espeak") is not None:
         try:
             engine = pyttsx3.init()
@@ -244,8 +238,8 @@ def text_to_speech(text):
             return audio_data, "audio/wav"
         except Exception as e:
             st.info("pyttsx3 conversion failed. Falling back to gTTS (chunked).")
-    # Use chunked gTTS fallback
-    return tts_gtts_chunked(text)
+    # Use gTTS fallback with chunking and retry mechanism
+    return tts_gtts_with_retries(text)
 
 def get_youtube_video(query):
     try:
