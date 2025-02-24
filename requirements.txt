@@ -4,8 +4,11 @@ numpy
 groq
 joblib
 reportlab
+datetime
 PyPDF2
 pyttsx3
 google-api-python-client
-gTTS
+shutil
+time
+gtts
 pydub
