@@ -1,10 +1,9 @@
 streamlit
 pandas
 numpy
-groq
 joblib
+groq
 reportlab
-datetime
 PyPDF2
 pyttsx3
 google-api-python-client
