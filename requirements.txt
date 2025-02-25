@@ -1,6 +1,5 @@
 streamlit
 pandas
-sklearn
 numpy
 groq
 joblib
