@@ -9,3 +9,4 @@ pyttsx3
 google-api-python-client
 gTTS
 pydub
+scikit-learn
