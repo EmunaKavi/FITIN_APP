@@ -21,6 +21,7 @@ YOUTUBE_API_KEY = "AIzaSyCg4MsfEezpeMY8QZ78WDDFqaQZv-keNxc"
 
 # Load trained model
 model_path = "Model/workout_recommender.pkl"
+model = joblib.load(model_path)
 if os.path.exists(model_path):
     model = joblib.load(model_path)
 else:
