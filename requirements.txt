@@ -1,13 +1,15 @@
 streamlit
+scikit-learn
 pandas
 numpy
-groq
+matplotlib
+seaborn
 joblib
-reportlab
-PyPDF2
-pyttsx3
-google-api-python-client
-gTTS
-pydub
-scikit-learn
-py-espeak-ng
+tensorflow  # (if using deep learning models)
+torch       # (if using PyTorch instead of TensorFlow)
+xgboost     # (if using XGBoost for classification)
+lightgbm    # (if using LightGBM for classification)
+scipy
+opencv-python-headless  # (if dealing with image-based classification)
+plotly      # (for interactive visualizations)
+requests    # (if fetching data from APIs)
