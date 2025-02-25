@@ -13,3 +13,4 @@ scipy
 opencv-python-headless  # (if dealing with image-based classification)
 plotly      # (for interactive visualizations)
 requests    # (if fetching data from APIs)
+eSpeak
